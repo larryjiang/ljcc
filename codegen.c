@@ -1,34 +1,52 @@
 #include "ljcc.h"
 
 static int depth;
+static void gen_expr(Node* node);
 
-static void push(void){
+static int count(void)
+{
+    static int i = 1;
+    return i++;
+};
+
+static void push(void)
+{
     printf("  push %%rax\n");
     depth++;
 };
 
-static void pop(char* arg){
+static void pop(char *arg)
+{
     printf("  pop %s\n", arg);
     depth--;
 };
 
-static int align_to(int n, int align){
+static int align_to(int n, int align)
+{
     return (n + align - 1) / align * align;
 };
 
+static void gen_addr(Node *node)
+{
 
-static void gen_addr(Node* node){
-    if(node->kind == ND_VAR){
+    switch (node->kind)
+    {
+    case ND_VAR:
         printf("    lea %d(%%rbp), %%rax\n", node->var->offset);
         return;
-    };
+    case ND_DEREF:
+        gen_expr(node->lhs);
+        return;
+    }
 
-    error("not an lvalue");
+    error_tok(node->tok,"not an lvalue");
 };
 
-static void assign_lvar_offsets(Function* prog){
+static void assign_lvar_offsets(Function *prog)
+{
     int offset = 0;
-    for(Obj* var = prog->locals; var; var = var->next){
+    for (Obj *var = prog->locals; var; var = var->next)
+    {
         offset += 8;
         var->offset = -offset;
     };
@@ -36,21 +54,27 @@ static void assign_lvar_offsets(Function* prog){
     prog->stack_size = align_to(offset, 16);
 };
 
-
-static void gen_expr(Node* node){
+static void gen_expr(Node *node)
+{
     switch (node->kind)
     {
     case ND_NUM:
         printf("  mov $%d, %%rax\n", node->val);
-        return; 
+        return;
     case ND_NEG:
         gen_expr(node->lhs);
         printf("  neg %%rax\n");
         return;
-
     case ND_VAR:
         gen_addr(node);
-        printf("    mov (%%rax), %%rax\n");
+        printf("  mov (%%rax), %%rax\n");
+        return;
+    case ND_DEREF:
+        gen_expr(node->lhs);
+        printf("  mov (%%rax), %%rax\n");
+        return;
+    case ND_ADDR:
+        gen_addr(node->lhs);
         return;
     case ND_ASSIGN:
         gen_addr(node->lhs);
@@ -88,13 +112,20 @@ static void gen_expr(Node* node){
     case ND_LE:
         printf("  cmp %%rdi, %%rax\n");
 
-        if(node->kind == ND_EQ){
+        if (node->kind == ND_EQ)
+        {
             printf("  sete %%al\n");
-        }else if(node->kind == ND_NE){
+        }
+        else if (node->kind == ND_NE)
+        {
             printf("  setne %%al\n");
-        }else if(node->kind == ND_LT){
+        }
+        else if (node->kind == ND_LT)
+        {
             printf("  setl %%al\n");
-        }else if(node->kind == ND_LE){
+        }
+        else if (node->kind == ND_LE)
+        {
             printf("  setle %%al\n");
         }
 
@@ -102,19 +133,80 @@ static void gen_expr(Node* node){
         return;
     }
 
-    error("invalid expression");
+    error_tok(node->tok,"invalid expression");
 };
 
-static void gen_stmt(Node* node){
-    if(node->kind == ND_EXPR_STMT){
+static void gen_stmt(Node *node)
+{
+    switch (node->kind)
+    {
+    case ND_IF:
+    {
+        int c = count();
+        gen_expr(node->cond);
+        printf("  cmp $0, %%rax\n");
+        printf("  je .L.else.%d\n", c);
+        gen_stmt(node->then);
+        printf("  jmp .L.end.%d\n", c);
+        printf(".L.else.%d:\n", c);
+        if (node->els)
+        {
+            gen_stmt(node->els);
+        };
+        printf(".L.end.%d:\n", c);
+        return;
+    }
+    case ND_FOR:
+    {
+        int c = count();
+        if(node->init){
+            gen_stmt(node->init);
+        };
+        printf(".L.begin.%d:\n", c);
+        if (node->cond)
+        {
+            gen_expr(node->cond);
+            printf("  cmp $0, %%rax\n");
+            printf("  je .L.end.%d\n", c);
+        };
+
+        gen_stmt(node->then);
+
+        if (node->inc)
+        {
+            gen_expr(node->inc);
+        };
+
+        printf("  jmp .L.begin.%d\n", c);
+        printf(".L.end.%d:\n", c);
+        return;
+    }
+    case ND_BLOCK:
+    {
+        for (Node *n = node->body; n; n = n->next)
+        {
+            gen_stmt(n);
+        };
+        return;
+    }
+    case ND_RETURN:
+    {
+        gen_expr(node->lhs);
+        printf("    jmp .L.return\n");
+        return;
+    }
+    case ND_EXPR_STMT:
+    {
         gen_expr(node->lhs);
         return;
-    };
+    }
+    }
 
-    error("invalid statement");
+    error_tok(node->tok,"invalid statement");
 };
 
-void codegen(Function* prog){
+void codegen(Function *prog)
+{
     assign_lvar_offsets(prog);
     printf("  .globl main\n");
     printf("main:\n");
@@ -123,12 +215,10 @@ void codegen(Function* prog){
     printf("    mov %%rsp, %%rbp\n");
     printf("    sub $%d, %%rsp\n", prog->stack_size);
 
-    for(Node* n = prog->body; n; n = n->next){
-        gen_stmt(n);
-        assert(depth == 0);
-    };
+    gen_stmt(prog->body);
 
+    printf(".L.return:\n");
     printf("    mov %%rbp, %%rsp\n");
     printf("    pop %%rbp\n");
-    printf("  ret\n");
+    printf("    ret\n");
 };

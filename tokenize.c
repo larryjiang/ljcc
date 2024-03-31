@@ -36,6 +36,8 @@ bool equal(Token *tok, char *op) {
   return memcmp(tok->loc, op, tok->len) == 0 && op[tok->len] == '\0';
 }
 
+
+
 Token *skip(Token *tok, char *op) {
   if (!equal(tok, op))
     error_tok(tok, "expected '%s'", op);
@@ -72,6 +74,28 @@ static int read_punct(char *p) {
   return ispunct(*p) ? 1 : 0;
 }
 
+static bool is_keyword(Token *tok)
+{
+  static char *kw[] = {"return", "if", "else", "for", "while"};
+  for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
+  {
+    if (equal(tok, kw[i]))
+    {
+      return true;
+    };
+  };
+
+  return false;
+};
+
+static void convert_keywords(Token* tok){
+  for(Token* t = tok; t->kind != TK_EOF; t = t->next){
+      if(is_keyword(t)){
+        t->kind = TK_KEYWORD;
+      };
+  };
+};
+
 // Tokenize `current_input` and returns new tokens.
 Token *tokenize(char *p) {
   current_input = p;
@@ -79,7 +103,7 @@ Token *tokenize(char *p) {
   Token *cur = &head;
 
   while (*p) {
-    // Skip whitespace characters.
+    // Skip whitespace characters
     if (isspace(*p)) {
       p++;
       continue;
@@ -118,8 +142,12 @@ Token *tokenize(char *p) {
   }
 
   cur = cur->next = new_token(TK_EOF, p, p);
+  convert_keywords(head.next);
   return head.next;
 }
+
+
+
 
 
 

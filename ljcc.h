@@ -7,12 +7,13 @@
 #include <string.h>
 #include <stdio.h>
 
-
+typedef struct Type Type;
 typedef struct Node Node;
 
 typedef enum {
     TK_IDENT,
     TK_PUNCT,
+    TK_KEYWORD,
     TK_NUM,
     TK_EOF,
 } TokenKind;
@@ -56,6 +57,12 @@ typedef enum{
     ND_LT,
     ND_LE,
     ND_ASSIGN,
+    ND_ADDR,
+    ND_DEREF,
+    ND_RETURN,
+    ND_IF,
+    ND_FOR,// "for" or "while"
+    ND_BLOCK,
     ND_EXPR_STMT,
     ND_NUM,
 } NodeKind;
@@ -64,11 +71,41 @@ typedef enum{
 struct Node {
     NodeKind kind;
     Node* next;
+    Type* ty;
+    Token* tok;
+
     Node *lhs;
     Node *rhs;
+
+//  "if" statement
+    Node* cond;
+    Node* then;
+    Node* els;
+
+    Node* init;
+    Node* inc;
+
+    Node *body;
     Obj* var;
     int val;
 };
+
+typedef enum {
+    TY_INT,
+    TY_PTR,
+} TypeKind;
+
+
+struct Type{
+    TypeKind kind;
+    Type* base;
+};
+
+
+extern Type* ty_int;
+bool is_integer(Type* ty);
+void add_type(Node* node);
+
 
 
 void error(char *fmt, ...);
