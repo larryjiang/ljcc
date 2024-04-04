@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "stdlib.h": "c",
+        "stdio.h": "c",
+        "stdbool.h": "c",
+        "cmath": "c",
+        "compare": "c",
+        "limits": "c",
+        "*.tcc": "c",
+        "type_traits": "c",
+        "*.inc": "c",
+        "ljcc.h": "c",
+        "ctype.h": "c"
+    },
+    "cmake.configureOnOpen": true
+}

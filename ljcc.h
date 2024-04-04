@@ -33,8 +33,11 @@ typedef struct Obj Obj;
 struct Obj {
     Obj *next;
     char *name;
+    Type* ty;
     int offset;
 };
+
+
 
 typedef struct Function Function;
 
@@ -61,8 +64,9 @@ typedef enum{
     ND_DEREF,
     ND_RETURN,
     ND_IF,
-    ND_FOR,// "for" or "while"
+    ND_FOR,// "for" or "swhile"
     ND_BLOCK,
+    ND_FUNCALL,
     ND_EXPR_STMT,
     ND_NUM,
 } NodeKind;
@@ -86,6 +90,9 @@ struct Node {
     Node* inc;
 
     Node *body;
+
+    char* funcname;
+
     Obj* var;
     int val;
 };
@@ -99,11 +106,13 @@ typedef enum {
 struct Type{
     TypeKind kind;
     Type* base;
+    Token* name;
 };
 
 
 extern Type* ty_int;
 bool is_integer(Type* ty);
+Type* pointer_to(Type* base);
 void add_type(Node* node);
 
 
@@ -113,6 +122,7 @@ void error_at(char* loc, char* fmt, ...);
 void error_tok(Token* tok, char* fmt, ...);
 bool equal(Token* tok, char* op);
 Token* skip(Token* tok, char* op);
+bool consume(Token** rest, Token* tok, char* str);
 Token* tokenize(char* input);
 Function *parse(Token* tok);
 
