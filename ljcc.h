@@ -34,14 +34,12 @@ struct Obj {
     Obj *next;
     char *name;
     Type* ty;
+
+    bool is_local;
     int offset;
-};
+    bool is_function;
 
-
-
-typedef struct Function Function;
-
-struct Function{
+    Obj* params;
     Node* body;
     Obj* locals;
     int stack_size;
@@ -92,6 +90,7 @@ struct Node {
     Node *body;
 
     char* funcname;
+    Node* args;
 
     Obj* var;
     int val;
@@ -100,20 +99,42 @@ struct Node {
 typedef enum {
     TY_INT,
     TY_PTR,
+    TY_FUNC,
+    TY_ARRAY,
 } TypeKind;
 
 
 struct Type{
     TypeKind kind;
+    int size;
+
+  // Pointer-to or array-of type. We intentionally use the same member
+  // to represent pointer/array duality in C.
+  //
+  // In many contexts in which a pointer is expected, we examine this
+  // member instead of "kind" member to determine whether a type is a
+  // pointer or not. That means in many contexts "array of T" is
+  // naturally handled as if it were "pointer to T", as required by
+  // the C spec.
+
     Type* base;
     Token* name;
+
+    int array_len;
+    Type* return_ty;
+    Type* params;
+    Type* next;
 };
 
 
 extern Type* ty_int;
 bool is_integer(Type* ty);
+Type* copy_type(Type* ty);
+Type* func_type(Type* return_ty);
 Type* pointer_to(Type* base);
 void add_type(Node* node);
+Type* array_of(Type* base, int size);
+
 
 
 
@@ -124,7 +145,7 @@ bool equal(Token* tok, char* op);
 Token* skip(Token* tok, char* op);
 bool consume(Token** rest, Token* tok, char* str);
 Token* tokenize(char* input);
-Function *parse(Token* tok);
+Obj *parse(Token* tok);
 
-void codegen(Function* prog);
+void codegen(Obj* prog);
 

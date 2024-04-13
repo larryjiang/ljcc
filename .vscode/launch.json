@@ -60,7 +60,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/chibicc",
             "args": [
-                "{int a = 3; return a;}"
+                "int main() { return add2(3,4); } int add2(int x, int y) { return x+y; }"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

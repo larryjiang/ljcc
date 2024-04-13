@@ -23,7 +23,7 @@ int main(int argc, char** argv){
     };
     Token* token = tokenize(argv[1]);
 
-    Function * node = parse(token);
+    Obj* node = parse(token);
 
     codegen(node);
 

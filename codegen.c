@@ -1,7 +1,9 @@
 #include "ljcc.h"
 
 static int depth;
-static void gen_expr(Node* node);
+static char *argreg[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
+static void gen_expr(Node *node);
+static Obj *current_fn;
 
 static int count(void)
 {
@@ -39,19 +41,47 @@ static void gen_addr(Node *node)
         return;
     }
 
-    error_tok(node->tok,"not an lvalue");
+    error_tok(node->tok, "not an lvalue");
 };
 
-static void assign_lvar_offsets(Function *prog)
-{
-    int offset = 0;
-    for (Obj *var = prog->locals; var; var = var->next)
-    {
-        offset += 8;
-        var->offset = -offset;
+static void load(Type* ty){
+    if(ty->kind == TY_ARRAY){
+    // If it is an array, do not attempt to load a value to the
+    // register because in general we can't load an entire array to a
+    // register. As a result, the result of an evaluation of an array
+    // becomes not the array itself but the address of the array.
+    // This is where "array is automatically converted to a pointer to
+    // the first element of the array in C" occurs.
+        return;
     };
 
-    prog->stack_size = align_to(offset, 16);
+    printf("  mov (%%rax), %%rax\n");
+};
+
+
+static void store(void){
+    pop("%rdi");
+    printf("  mov %%rax, (%rdi)\n");
+};
+
+
+static void assign_lvar_offsets(Obj *prog)
+{
+
+    for (Obj *fn = prog; fn; fn = fn->next)
+    {
+        if(!fn->is_function){
+            continue;
+        };
+
+        int offset = 0;
+        for (Obj *var = fn->locals; var; var = var->next)
+        {
+            offset += var->ty->size;
+            var->offset = -offset;
+        };
+        fn->stack_size = align_to(offset, 16);
+    };
 };
 
 static void gen_expr(Node *node)
@@ -67,11 +97,11 @@ static void gen_expr(Node *node)
         return;
     case ND_VAR:
         gen_addr(node);
-        printf("  mov (%%rax), %%rax\n");
+        load(node->ty);
         return;
     case ND_DEREF:
         gen_expr(node->lhs);
-        printf("  mov (%%rax), %%rax\n");
+        load(node->ty);
         return;
     case ND_ADDR:
         gen_addr(node->lhs);
@@ -80,13 +110,27 @@ static void gen_expr(Node *node)
         gen_addr(node->lhs);
         push();
         gen_expr(node->rhs);
-        pop("%rdi");
-        printf("    mov %%rax, (%%rdi)\n");
+        store();
         return;
     case ND_FUNCALL:
+    {
+        int nargs = 0;
+        for (Node *arg = node->args; arg; arg = arg->next)
+        {
+            gen_expr(arg);
+            push();
+            nargs++;
+        };
+
+        for (int i = nargs - 1; i >= 0; i--)
+        {
+            pop(argreg[i]);
+        };
+
         printf("  mov $0, %%rax\n");
         printf("  call %s\n", node->funcname);
         return;
+    }
     }
 
     gen_expr(node->rhs);
@@ -137,7 +181,7 @@ static void gen_expr(Node *node)
         return;
     }
 
-    error_tok(node->tok,"invalid expression");
+    error_tok(node->tok, "invalid expression");
 };
 
 static void gen_stmt(Node *node)
@@ -163,7 +207,8 @@ static void gen_stmt(Node *node)
     case ND_FOR:
     {
         int c = count();
-        if(node->init){
+        if (node->init)
+        {
             gen_stmt(node->init);
         };
         printf(".L.begin.%d:\n", c);
@@ -196,7 +241,7 @@ static void gen_stmt(Node *node)
     case ND_RETURN:
     {
         gen_expr(node->lhs);
-        printf("    jmp .L.return\n");
+        printf("    jmp .L.return.%s\n", current_fn->name);
         return;
     }
     case ND_EXPR_STMT:
@@ -206,23 +251,40 @@ static void gen_stmt(Node *node)
     }
     }
 
-    error_tok(node->tok,"invalid statement");
+    error_tok(node->tok, "invalid statement");
 };
 
-void codegen(Function *prog)
+void codegen(Obj *prog)
 {
     assign_lvar_offsets(prog);
-    printf("  .globl main\n");
-    printf("main:\n");
 
-    printf("    push %%rbp\n");
-    printf("    mov %%rsp, %%rbp\n");
-    printf("    sub $%d, %%rsp\n", prog->stack_size);
+    for(Obj* fn = prog; fn; fn = fn->next){
+        if(!fn->is_function){
+            continue;
+        };
+        printf("  .globl %s\n",fn->name);
+        printf("  .text\n");
+        printf("%s:\n",fn->name);
+        current_fn = fn;
 
-    gen_stmt(prog->body);
+        printf("  push %%rbp\n");
+        printf("  mov %%rsp, %%rbp\n");
+        printf("  sub $%d, %%rsp\n",fn->stack_size);
 
-    printf(".L.return:\n");
-    printf("    mov %%rbp, %%rsp\n");
-    printf("    pop %%rbp\n");
-    printf("    ret\n");
+        int i = 0;
+        for(Obj* var = fn->params; var; var = var->next){
+            printf("  mov %s, %d(%%rbp)\n", argreg[i++], var->offset);
+        };
+
+        gen_stmt(fn->body);
+        assert(depth == 0);
+
+        printf(".L.return.%s:\n",fn->name);
+        printf("  mov %%rbp, %%rsp\n");
+        printf("  pop %%rbp\n");
+        printf("  ret\n");
+    };
 };
+
+
+
