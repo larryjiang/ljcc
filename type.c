@@ -1,6 +1,6 @@
 #include "ljcc.h"
 
-Type* ty_int = &(Type){TY_INT};
+Type* ty_int = &(Type){TY_INT, 8};
 
 bool is_integer(Type* ty){
     return ty->kind == TY_INT;
