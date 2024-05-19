@@ -81,6 +81,14 @@ assert 5 'int main(){;;; return 5;}'
 assert 3 'int main(){ if (0) return 2; return 3;}'
 assert 3 'int main(){ if (1-1) return 2; return 3;}'
 assert 2 'int main(){ if (1) return 2; return 3;}'
+assert 0 'int main() { return ""[0]; }'
+assert 1 'int main() { return sizeof(""); }'
+
+assert 97 'int main() { return "abc"[0]; }'
+assert 98 'int main() { return "abc"[1]; }'
+assert 99 'int main() { return "abc"[2]; }'
+assert 0 'int main() { return "abc"[3]; }'
+assert 4 'int main() { return sizeof("abc"); }'
 assert 2 'int main(){ if (2-1) return 2; return 3;}'
 assert 4 'int main(){ if (0) {1; 2; return 3;} else { return 4;} }'
 assert 3 'int main(){ if (1) {1; 2; return 3;} else { return 4;} }'
@@ -190,6 +198,24 @@ assert 98 'int main() { return "abc"[1]; }'
 assert 99 'int main() { return "abc"[2]; }'
 assert 0 'int main() { return "abc"[3]; }'
 assert 4 'int main() { return sizeof("abc"); }'
+
+
+
+assert 0 'int main() { return ({ 0; }); }'
+assert 2 'int main() { return ({ 0; 1; 2; }); }'
+assert 1 'int main() { ({ 0; return 1; 2; }); return 3; }'
+assert 6 'int main() { return ({ 1; }) + ({ 2; }) + ({ 3; }); }'
+assert 3 'int main() { return ({ int x=3; x; }); }'
+
+
+
+assert 2 'int main() { int x=2; { int x=3; } return x; }'
+assert 2 'int main() { int x=2; { int x=3; } { int y=4; return x; }}'
+assert 3 'int main() { int x=2; { x=3; } return x; }'
+
+
+
+
 echo OK
 
 

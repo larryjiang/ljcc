@@ -10,6 +10,14 @@
 typedef struct Type Type;
 typedef struct Node Node;
 
+//
+//strings.c
+//
+
+char* format(char* fmt, ...);
+
+
+
 typedef enum {
     TK_IDENT,
     TK_PUNCT,
@@ -71,12 +79,14 @@ typedef enum{
     ND_ASSIGN,
     ND_ADDR,
     ND_DEREF,
+    ND_COMMA,
     ND_RETURN,
     ND_IF,
     ND_FOR,// "for" or "swhile"
     ND_BLOCK,
     ND_FUNCALL,
     ND_EXPR_STMT,
+    ND_STMT_EXPR,
     ND_NUM,
 } NodeKind;
 

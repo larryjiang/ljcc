@@ -20,9 +20,27 @@
 
 #include "ljcc.h"
 
+typedef struct  VarScope VarScope;
+
+struct VarScope
+{
+    VarScope* next;
+    char* name;
+    Obj* var;
+};
+
+ 
+typedef struct Scope Scope;
+struct  Scope
+{
+    Scope* next;
+    VarScope* vars;
+};
+
 
 static Obj* locals;
 static Obj* globals;
+static Scope* scope = &(Scope){};
 
 static Type* declspec(Token** rest, Token* tok);
 static Type* declarator(Token** rest, Token* tok, Type* ty);
@@ -37,6 +55,7 @@ static Node *relational(Token **rest, Token *tok);
 static Node *add(Token** rest, Token *tok);
 static Node *mul(Token** rest, Token* tok);
 static Node *primary(Token** rest, Token* tok);
+
 static Node *postfix(Token** rest, Token* tok);
 static Node *unary(Token** rest, Token* tok);
 static Node *new_unary(NodeKind kind, Node* expr, Token* tok);
@@ -46,22 +65,36 @@ static Node *funcall(Token** rest, Token* tok);
 static Node *new_add(Node* lhs, Node* rhs, Token* tok);
 static Node *new_sub(Node* lhs, Node* rhs, Token* tok);
 
+
+static void enter_scope(void){
+    Scope* sc = calloc(1, sizeof(Scope));
+    sc->next = scope;
+    scope = sc;
+};
+
+static void leave_scope(void){
+    scope = scope->next;
+};
+
+
+
 static Obj* find_var(Token* tok){
-    for(Obj* var = locals; var; var = var->next){
-        if(strlen(var->name) == tok->len  && !strncmp(tok->loc, var->name, tok->len)){
-            return var;
+
+    for(Scope* sc  = scope; sc; sc = sc->next){
+        for(VarScope* sc2 = sc->vars; sc2; sc2 = sc2->next){
+           if(equal(tok, sc2->name)){
+                return sc2->var;
+           }; 
         };
-    };
-
-    for(Obj* var = globals; var; var = var->next){
-       if(strlen(var->name) == tok->len && !strncmp(tok->loc, var->name, tok->len)){
-        return var;
-       };
-
     };
 
     return NULL;
 };
+
+
+
+
+
 
 static Node *new_node(NodeKind kind, Token* tok){
     Node *node = calloc(1, sizeof(Node));
@@ -77,10 +110,26 @@ static Node* new_var_node(Obj* var, Token* tok){
 };
 
 
+static  VarScope*  push_scope(char* name, Obj* var){
+    VarScope* sc = calloc(1, sizeof(VarScope));
+    sc->name = name;
+    sc->var = var;
+    sc->next = scope->vars;
+    scope->vars = sc;
+    return sc;
+};
+
+
+
+
+
+
+
 static Obj* new_var(char* name, Type* ty){
     Obj* var = calloc(1, sizeof(Obj));
     var->name = name;
     var->ty = ty;
+    push_scope(name,var);
     return var;
 };
 
@@ -102,9 +151,7 @@ static Obj* new_gvar(char* name, Type* ty){
 
 static char* new_unique_name(void){
     static int id = 0;
-    char* buf = calloc(1,20);
-    sprintf(buf, ".L..%d", id++);
-    return buf;
+    return format(".L..%d", id++);
 };
 
 
@@ -323,7 +370,7 @@ static Node* compound_stmt(Token** rest, Token* tok){
     Node * node = new_node(ND_BLOCK, tok);
     Node head = {};
     Node *cur = &head;
-
+    enter_scope();
     while (!equal(tok, "}"))
     {
         if(is_typename(tok)){
@@ -334,7 +381,7 @@ static Node* compound_stmt(Token** rest, Token* tok){
 
         add_type(cur);
     }
-
+    leave_scope();
     node->body = head.next;
     *rest = tok->next;
     return node;
@@ -353,9 +400,15 @@ static Node* expr_stmt(Token** rest, Token* tok){
     return node;
 };
 
-// expr = assign
+// expr = assign (",", expr) ?
 static Node *expr(Token** rest, Token *tok){
-   return assign(rest, tok); 
+    Node* node = assign(&tok, tok);
+    if(equal(tok,",")){
+        return new_binary(ND_COMMA, node, expr(rest, tok->next), tok);
+    };
+
+    *rest = tok;
+    return node;
 };
 
 
@@ -615,9 +668,16 @@ static Node* postfix(Token** rest, Token* tok){
     return node;
 };
 
-// primary = "(" expr ")" | "sizeof" unary |ident func-args? | str | num | ident args?
+// primary = "(" "{" stmt+"}"" ")" | "sizeof" unary |ident func-args? | str | num | ident args?
 // args = "(" ")"
 static Node *primary(Token ** rest, Token* tok){
+    if(equal(tok,"(") && equal(tok->next, "{")){
+        Node* node = new_node(ND_STMT_EXPR, tok);
+        node->body = compound_stmt(&tok, tok->next->next)->body;
+        *rest = skip(tok, ")");
+        return node;
+    }; 
+
     if(equal(tok, "(")){
         Node* node = expr(&tok, tok->next);
         *rest = skip(tok, ")");
@@ -704,7 +764,7 @@ static Token* function(Token* tok, Type* basety){
     fn->is_function = true;
 
     locals = NULL;
-    
+    enter_scope(); 
     create_param_lvars(ty->params);
 
     fn->params = locals;
@@ -713,6 +773,7 @@ static Token* function(Token* tok, Type* basety){
     tok = skip(tok, "{");
     fn->body = compound_stmt(&tok, tok);
     fn->locals = locals;
+    leave_scope();
     return tok;
 };
 

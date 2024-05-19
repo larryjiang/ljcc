@@ -85,6 +85,9 @@ void add_type(Node* node){
     case ND_VAR:
         node->ty = node->var->ty;
         return;
+    case ND_COMMA:
+        node->ty = node->rhs->ty;
+        return;
    case ND_ADDR:
         if(node->lhs->ty->kind == TY_ARRAY){
             node->ty = pointer_to(node->lhs->ty->base);
@@ -98,6 +101,20 @@ void add_type(Node* node){
         };
 
         node->ty = node->lhs->ty->base;
+        return;
+    case ND_STMT_EXPR:
+        if(node->body){
+            Node* stmt = node->body;
+            while(stmt->next){
+                stmt = stmt->next;
+            };
+
+            if(stmt->kind == ND_EXPR_STMT){
+                node->ty = stmt->lhs->ty;
+                return;
+            };
+        };
+        error_tok(node->tok, "statement expression returning void is not supported!");
         return;
     } 
 };

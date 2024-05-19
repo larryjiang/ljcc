@@ -4,6 +4,7 @@ static int depth;
 static char *argreg8[] = {"%dil", "%sil", "%dl", "%cl", "%r8b", "%r9b"};
 static char *argreg64[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
 static void gen_expr(Node *node);
+static void gen_stmt(Node *node);
 static Obj *current_fn;
 
 static int count(void)
@@ -44,7 +45,13 @@ static void gen_addr(Node *node)
     case ND_DEREF:
         gen_expr(node->lhs);
         return;
+    case ND_COMMA:
+        gen_expr(node->lhs);
+        gen_addr(node->rhs);
+        return;
     }
+
+
 
     error_tok(node->tok, "not an lvalue");
 };
@@ -117,6 +124,10 @@ static void gen_expr(Node *node)
         gen_expr(node->lhs);
         load(node->ty);
         return;
+    case ND_COMMA:
+        gen_expr(node->lhs);
+        gen_expr(node->rhs);
+        return;
     case ND_ADDR:
         gen_addr(node->lhs);
         return;
@@ -125,6 +136,11 @@ static void gen_expr(Node *node)
         push();
         gen_expr(node->rhs);
         store(node->ty);
+        return;
+    case ND_STMT_EXPR:
+        for(Node* n = node->body; n; n = n->next){
+            gen_stmt(n);
+        };
         return;
     case ND_FUNCALL:
     {
