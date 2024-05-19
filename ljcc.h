@@ -14,6 +14,7 @@ typedef enum {
     TK_IDENT,
     TK_PUNCT,
     TK_KEYWORD,
+    TK_STR,
     TK_NUM,
     TK_EOF,
 } TokenKind;
@@ -26,6 +27,9 @@ struct Token {
     int val;
     char* loc;
     int len;
+
+    Type* ty;
+    char* str;
 };
 
 typedef struct Obj Obj;
@@ -43,7 +47,14 @@ struct Obj {
     Node* body;
     Obj* locals;
     int stack_size;
+
+    char* init_data;
 };
+
+
+
+
+
 
 
 typedef enum{
