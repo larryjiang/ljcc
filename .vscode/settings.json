@@ -10,7 +10,8 @@
         "type_traits": "c",
         "*.inc": "c",
         "ljcc.h": "c",
-        "ctype.h": "c"
+        "ctype.h": "c",
+        "test.h": "c"
     },
     "cmake.configureOnOpen": true
 }

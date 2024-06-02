@@ -9,6 +9,7 @@
 
 typedef struct Type Type;
 typedef struct Node Node;
+typedef struct Member Member;
 
 //
 //strings.c
@@ -80,6 +81,7 @@ typedef enum{
     ND_ADDR,
     ND_DEREF,
     ND_COMMA,
+    ND_MEMBER,
     ND_RETURN,
     ND_IF,
     ND_FOR,// "for" or "swhile"
@@ -110,6 +112,8 @@ struct Node {
 
     Node *body;
 
+    Member* member;
+
     char* funcname;
     Node* args;
 
@@ -123,6 +127,7 @@ typedef enum {
     TY_PTR,
     TY_FUNC,
     TY_ARRAY,
+    TY_STRUCT,
 } TypeKind;
 
 
@@ -143,10 +148,21 @@ struct Type{
     Token* name;
 
     int array_len;
+    Member *members;
     Type* return_ty;
     Type* params;
     Type* next;
 };
+
+
+struct Member
+{
+    Member* next;
+    Type* ty;
+    Token* name;
+    int offset;
+};
+
 
 extern Type* ty_char;
 extern Type* ty_int;
