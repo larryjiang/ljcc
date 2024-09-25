@@ -11,7 +11,11 @@
         "*.inc": "c",
         "ljcc.h": "c",
         "ctype.h": "c",
-        "test.h": "c"
+        "test.h": "c",
+        "errno.h": "c",
+        "features.h": "c",
+        "stdarg.h": "c",
+        "assert.h": "c"
     },
     "cmake.configureOnOpen": true
 }
